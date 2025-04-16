@@ -227,7 +227,7 @@ export default class Embed {
 
   async handleIframelyFetch(url: string) {
     const iframelyApiKey = '2142942481b218a645897e';
-    const apiUrl = `https://iframe.ly/api/iframely?url=${encodeURIComponent(url)}&key=${iframelyApiKey}`;
+    const apiUrl = `https://iframe.ly/api/iframely?url=${encodeURIComponent(url)}&api_key=${iframelyApiKey}`;
     console.log('[Embed] iframely: fetch', apiUrl);
     try {
       const resp = await fetch(apiUrl);
