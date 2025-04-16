@@ -1,4 +1,3 @@
-
 /**
  * @description Service configuration object
  */
@@ -15,6 +14,8 @@ export interface ServiceConfig {
   width?: number;
   /** Embedded content height */
   height?: number;
+  /** Custom flag for Iframely */
+  useIframelyAPI?: boolean;
 }
 
 /**

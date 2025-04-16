@@ -2,7 +2,7 @@ import SERVICES from './services';
 import './index.css';
 import { debounce } from 'debounce';
 import type { ServiceConfig, ServicesConfigType } from './serviceConfig';
-import type { API , PatternPasteEventDetail } from '@editorjs/editorjs';
+import type { API, PatternPasteEventDetail } from '@editorjs/editorjs';
 
 /**
  * @description Embed Tool data
@@ -13,21 +13,27 @@ export interface EmbedData {
   /** Source URL of embedded content */
   source: string;
   /** URL to source embed page */
-  embed: string;
+  embed?: string;
+  /** Fetched HTML content */
+  html?: string;
   /** Embedded content width */
   width?: number;
   /** Embedded content height */
   height?: number;
   /** Content caption */
   caption?: string;
+  /** Flag to indicate if data needs fetching */
+  needsFetching?: boolean;
 }
 
 /**
  * @description Embed tool configuration object
  */
 interface EmbedConfig {
-  /** Additional services provided by user */
-  services?: ServicesConfigType;
+  /** Service configuration object or boolean map */
+  services?: ServicesConfigType | { [key: string]: boolean };
+  /** Iframely API key */
+  iframelyApiKey?: string;
 }
 
 /**
@@ -54,7 +60,9 @@ interface CSS {
 
 interface ConstructorArgs {
   // data — previously saved data
-  data: EmbedData;
+  data: Partial<EmbedData>;
+  // config - user config for Tool
+  config: EmbedConfig;
   // api - Editor.js API
   api: API;
   // readOnly - read-only mode flag
@@ -81,6 +89,8 @@ export default class Embed {
   private element: HTMLElement | null;
   /** Read-only mode flag */
   private readOnly: boolean;
+  /** Embed tool config */
+  private config: EmbedConfig;
   /** Static property with available services */
   static services: { [key: string]: ServiceConfig };
   /** Static property with patterns for paste handling configuration */
@@ -92,13 +102,16 @@ export default class Embed {
    *   api - Editor.js API
    *   readOnly - read-only mode flag
    */
-  constructor({ data, api, readOnly }: ConstructorArgs) {
+  constructor({ data, config, api, readOnly }: ConstructorArgs) {
     this.api = api;
-    this._data = {} as EmbedData;
+    this.config = config; // Store config
+    this._data = {
+      service: data.service || '', // Ensure service is initialized
+      source: data.source || '',   // Ensure source is initialized
+      ...data,
+    };
     this.element = null;
     this.readOnly = readOnly;
-
-    this.data = data;
   }
 
   /**
@@ -111,19 +124,24 @@ export default class Embed {
    * @param {string} [data.caption] - caption
    */
   set data(data: EmbedData) {
-    if (!(data instanceof Object)) {
-      throw Error('Embed Tool data should be object');
-    }
+    // Allow setting partial data, especially during fetching
+    // if (!(data instanceof Object)) {
+    //   throw Error('Embed Tool data should be object');
+    // }
 
-    const { service, source, embed, width, height, caption = '' } = data;
+    // Merge new data with existing data
+    const newData = { ...this._data, ...data };
+    const { service, source, embed, width, height, caption = '', html, needsFetching } = newData;
 
     this._data = {
-      service: service || this.data.service,
-      source: source || this.data.source,
-      embed: embed || this.data.embed,
-      width: width || this.data.width,
-      height: height || this.data.height,
-      caption: caption || this.data.caption || '',
+      service,
+      source,
+      embed,
+      width,
+      height,
+      caption,
+      html, // Store HTML
+      needsFetching, // Store fetch flag
     };
 
     const oldView = this.element;
@@ -131,19 +149,6 @@ export default class Embed {
     if (oldView) {
       oldView.parentNode?.replaceChild(this.render(), oldView);
     }
-  }
-
-  /**
-   * @returns {EmbedData}
-   */
-  get data(): EmbedData {
-    if (this.element) {
-      const caption = this.element.querySelector(`.${this.api.styles.input}`) as HTMLElement;
-
-      this._data.caption = caption ? caption.innerHTML : '';
-    }
-
-    return this._data;
   }
 
   /**
@@ -170,6 +175,47 @@ export default class Embed {
    * @returns {HTMLElement}
    */
   render(): HTMLElement {
+    // Initial render or re-render
+
+    // Handle case where service is Iframely and needs fetching
+    if (this.data.service === 'iframelyService' && this.data.needsFetching) {
+      const container = document.createElement('div');
+      container.classList.add(this.CSS.baseClass, this.CSS.container, this.CSS.containerLoading);
+      const preloader = this.createPreloader(); // Use existing preloader
+      container.appendChild(preloader);
+      this.element = container;
+
+      // Trigger async fetch, do not block render
+      this.fetchIframelyData(this.data.source || '');
+
+      return container;
+    }
+
+    // Handle case where service is Iframely and data is fetched (or failed)
+    if (this.data.service === 'iframelyService' && this.data.html) {
+      const container = document.createElement('div');
+      container.classList.add(this.CSS.baseClass, this.CSS.container);
+
+      // Create content element (e.g., a div to hold the raw HTML)
+      const content = document.createElement('div');
+      content.classList.add(this.CSS.content);
+      content.innerHTML = this.data.html;
+
+      // Create caption element
+      const caption = document.createElement('div');
+      caption.classList.add(this.CSS.input, this.CSS.caption);
+      caption.contentEditable = (!this.readOnly).toString();
+      caption.dataset.placeholder = this.api.i18n.t('Enter a caption');
+      caption.innerHTML = this.data.caption || '';
+
+      container.appendChild(content);
+      container.appendChild(caption);
+
+      this.element = container;
+      return container;
+    }
+
+    // Original logic for standard services or initial empty state
     if (!this.data.service) {
       const container = document.createElement('div');
 
@@ -194,7 +240,9 @@ export default class Embed {
     caption.innerHTML = this.data.caption || '';
 
     template.innerHTML = html;
-    (template.content.firstChild as HTMLElement).setAttribute('src', this.data.embed);
+    if (this.data.embed && template.content.firstChild instanceof HTMLElement) {
+      (template.content.firstChild as HTMLElement).setAttribute('src', this.data.embed);
+    }
     (template.content.firstChild as HTMLElement).classList.add(this.CSS.content);
 
     const embedIsReady = this.embedIsReady(container);
@@ -223,7 +271,7 @@ export default class Embed {
     const preloader = document.createElement('preloader');
     const url = document.createElement('div');
 
-    url.textContent = this.data.source;
+    url.textContent = this.data.source || 'Loading...';
 
     preloader.classList.add(this.CSS.preloader);
     url.classList.add(this.CSS.url);
@@ -239,7 +287,41 @@ export default class Embed {
    * @returns {EmbedData}
    */
   save(): EmbedData {
-    return this.data;
+    // Ensure caption is updated from the DOM before saving
+    const captionElement = this.element?.querySelector(`.${this.CSS.input}.${this.CSS.caption}`) as HTMLElement | null;
+    if (captionElement) {
+      this._data.caption = captionElement.innerHTML;
+    }
+
+    // Return the complete data object, potentially removing the fetch flag
+    const { needsFetching, ...dataToSave } = this._data;
+    console.log('Saving Embed data:', dataToSave);
+    return dataToSave;
+  }
+
+  /**
+   * Validate Embed block data:
+   * - For Iframely, check if service is 'iframelyService' and html/source are present.
+   * - For others, check if service and source/embed are present.
+   */
+  validate(savedData: EmbedData): boolean {
+    if (savedData.service === 'iframelyService') {
+      const isValid = typeof savedData.source === 'string' && savedData.source.length > 0 &&
+                      typeof savedData.html === 'string' && savedData.html.length > 0;
+      if (!isValid) {
+        console.warn('Iframely embed validation failed:', savedData);
+      }
+      return isValid;
+    } else {
+      // Original validation logic (implicitly done by checking service and source/embed)
+      const isValid = typeof savedData.service === 'string' && savedData.service.length > 0 &&
+                      (typeof savedData.source === 'string' && savedData.source.length > 0 ||
+                       typeof savedData.embed === 'string' && savedData.embed.length > 0);
+      if (!isValid) {
+        console.warn('Standard embed validation failed:', savedData);
+      }
+      return isValid;
+    }
   }
 
   /**
@@ -247,20 +329,89 @@ export default class Embed {
    *
    * @param {PasteEvent} event - event with pasted data
    */
-  onPaste(event: { detail: PatternPasteEventDetail }) {
-    const { key: service, data: url } = event.detail;
+  onPaste(event: { detail: PatternPasteEventDetail }): void {
+    const { key: serviceKey, data: url } = event.detail;
+    const service = Embed.services[serviceKey];
 
-    const { regex, embedUrl, width, height, id = (ids) => ids.shift() || '' } = Embed.services[service];
-    const result = regex.exec(url)?.slice(1);
-    const embed = result ? embedUrl.replace(/<%= remote_id %>/g, id(result)) : '';
+    if (service.useIframelyAPI) {
+      console.log('Pasted URL will be handled by Iframely:', url);
+      this.data = {
+        service: serviceKey,
+        source: url,
+        embed: '', // Will be fetched
+        html: '',  // Will be fetched
+        needsFetching: true, // Add a flag to trigger fetch in render
+      } as EmbedData; // Cast to EmbedData, maybe add needsFetching to EmbedData interface?
+    } else {
+      // Original logic for standard services
+      const { regex, embedUrl, width, height, id = (ids) => ids.shift() || '' } = service;
+      const result = regex.exec(url)?.slice(1);
+      const embed = result ? embedUrl.replace(/<%= remote_id %>/g, id(result)) : '';
 
-    this.data = {
-      service,
-      source: url,
-      embed,
-      width,
-      height,
-    };
+      this.data = {
+        service: serviceKey,
+        source: url,
+        embed,
+        width,
+        height,
+      };
+    }
+  }
+
+  /**
+   * Fetches embed data from Iframely API.
+   * @param sourceUrl - The URL to fetch embed data for.
+   */
+  async fetchIframelyData(sourceUrl: string): Promise<void> {
+    if (!this.config.iframelyApiKey) {
+      console.error('Iframely API key is not configured.');
+      // Maybe show an error state in the UI?
+      return;
+    }
+
+    const apiUrl = `https://iframe.ly/api/iframely?url=${encodeURIComponent(sourceUrl)}&key=${this.config.iframelyApiKey}`;
+
+    console.log('Fetching Iframely data from:', apiUrl);
+
+    try {
+      const response = await fetch(apiUrl);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Iframely API Error:', response.status, errorText);
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
+
+      const data = await response.json();
+
+      if (!data || !data.html) {
+        console.warn('Iframely API returned no HTML for URL:', sourceUrl, 'Response:', data);
+        throw new Error('No HTML content found for this URL.');
+      }
+
+      console.log('Iframely data fetched successfully:', data);
+
+      // Update internal data and trigger re-render via setter
+      this.data = {
+        ...this._data, // Keep existing data like source, service
+        html: data.html,
+        embed: data.links?.player?.[0]?.href || data.url, // Try to get player link or fallback to original url
+        // Optionally store other meta if needed (e.g., title, description)
+        // title: data.meta?.title,
+        // description: data.meta?.description,
+        needsFetching: false, // Mark as fetched
+      };
+
+    } catch (error) {
+      console.error('Failed to fetch Iframely data:', error);
+      // Show error state?
+      // Optionally update data to reflect error state
+      this.data = {
+        ...this._data,
+        html: '<p>Error loading embed.</p>', // Show error message
+        needsFetching: false,
+      };
+    }
   }
 
   /**
@@ -268,8 +419,8 @@ export default class Embed {
    *
    * @param {EmbedConfig} config - configuration of embed block element
    */
-  static prepare({ config = {} } : {config: EmbedConfig}) {
-    const { services = {} } = config;
+  static prepare({ config = {} }: { config: EmbedConfig }): void {
+    const { services = {}, iframelyApiKey } = config;
 
     let entries = Object.entries(SERVICES);
 
@@ -305,7 +456,7 @@ export default class Embed {
 
     entries = entries.concat(userServices);
 
-    Embed.services = entries.reduce<{ [key: string]: ServiceConfig }>((result, [key, service]) => {
+    const result = entries.reduce<{ [key: string]: ServiceConfig }>((result, [key, service]) => {
       if (!(key in result)) {
         result[key] = service as ServiceConfig;
 
@@ -317,7 +468,22 @@ export default class Embed {
       return result;
     }, {});
 
-    Embed.patterns = entries
+    // Add our custom Iframely service if API key is provided
+    if (iframelyApiKey) {
+      result['iframelyService'] = {
+        // Match any http/https URL. Adjust if needed.
+        regex: /^(http|https):\/\/.+/,
+        useIframelyAPI: true, // Our custom flag
+        embedUrl: '', // Dummy value to satisfy ServiceConfig type
+        // No embedUrl or html needed here
+        // Provide dummy html structure for initial render if needed?
+        html: '<div class="cdx-block embed-tool__content"></div>' // Basic placeholder
+      } as ServiceConfig; // Cast needed?
+    }
+
+    Embed.services = result;
+
+    Embed.patterns = Object.entries(Embed.services)
       .reduce<{ [key: string]: RegExp }>((result, [key, item]) => {
         if (item && typeof item !== 'boolean') {
           result[key] = (item as ServiceConfig).regex as RegExp;
@@ -334,7 +500,7 @@ export default class Embed {
    * @returns {boolean}
    */
   static checkServiceConfig(config: ServiceConfig): boolean {
-    const { regex, embedUrl, html, height, width, id } = config;
+    const { regex, embedUrl, html, height, width, id, useIframelyAPI } = config;
 
     let isValid = Boolean(regex && regex instanceof RegExp) &&
       Boolean(embedUrl && typeof embedUrl === 'string') &&
@@ -343,6 +509,7 @@ export default class Embed {
     isValid = isValid && (id !== undefined ? id instanceof Function : true);
     isValid = isValid && (height !== undefined ? Number.isFinite(height) : true);
     isValid = isValid && (width !== undefined ? Number.isFinite(width) : true);
+    isValid = isValid && (useIframelyAPI !== undefined ? typeof useIframelyAPI === 'boolean' : true);
 
     return isValid;
   }
