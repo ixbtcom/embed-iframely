@@ -1,36 +1,30 @@
 import SERVICES from './services';
 import './index.css';
 import { debounce } from 'debounce';
-import type { ServiceConfig, ServicesConfigType } from './serviceConfig';
-import type { API , PatternPasteEventDetail } from '@editorjs/editorjs';
+import type { API, PatternPasteEventDetail } from '@editorjs/editorjs';
 
 /**
- * @description Embed Tool data
+ * @description Iframely Tool data
  */
-export interface EmbedData {
-  /** Service name */
-  service: string;
-  /** Source URL of embedded content */
-  source: string;
-  /** URL to source embed page */
-  embed: string;
-  /** Embedded content width */
-  width?: number;
-  /** Embedded content height */
-  height?: number;
+export interface IframelyData {
   /** Content caption */
   caption?: string;
-
-  /** Embed html */
-  embedhtml?: string;
+  /** Embedded content HTML */
+  html?: string;
+  /** Service key */
+  key?: string;
+  /** Service provider */
+  provider?: string;
+  /** Source URL of embedded content */
+  url?: string;
 }
 
 /**
- * @description Embed tool configuration object
+ * @description Iframely tool configuration object
  */
-interface EmbedConfig {
+interface IframelyConfig {
   /** Additional services provided by user */
-  services?: ServicesConfigType;
+  services?: any;
 }
 
 /**
@@ -57,7 +51,7 @@ interface CSS {
 
 interface ConstructorArgs {
   // data — previously saved data
-  data: EmbedData;
+  data: IframelyData;
   // api - Editor.js API
   api: API;
   // readOnly - read-only mode flag
@@ -65,31 +59,31 @@ interface ConstructorArgs {
 }
 
 /**
- * @class Embed
- * @classdesc Embed Tool for Editor.js 2.0
+ * @class Iframely
+ * @classdesc Iframely Tool for Editor.js 2.0
  *
  * @property {object} api - Editor.js API
- * @property {EmbedData} _data - private property with Embed data
+ * @property {IframelyData} _data - private property with Iframely data
  * @property {HTMLElement} element - embedded content container
  *
  * @property {object} services - static property with available services
  * @property {object} patterns - static property with patterns for paste handling configuration
  */
-export default class Embed {
+export default class Iframely {
   /** Editor.js API */
   private api: API;
-  /** Private property with Embed data */
-  private _data: EmbedData;
+  /** Private property with Iframely data */
+  private _data: IframelyData;
   /** Embedded content container */
   private element: HTMLElement | null;
   /** Read-only mode flag */
   private readOnly: boolean;
   /** Static property with available services */
-  static services: { [key: string]: ServiceConfig };
+  static services: { [key: string]: any };
   /** Static property with patterns for paste handling configuration */
   static patterns: { [key: string]: RegExp };
   /**
-   * @param {{data: EmbedData, config: EmbedConfig, api: object}}
+   * @param {{data: IframelyData, config: IframelyConfig, api: object}}
    *   data — previously saved data
    *   config - user config for Tool
    *   api - Editor.js API
@@ -97,7 +91,7 @@ export default class Embed {
    */
   constructor({ data, api, readOnly }: ConstructorArgs) {
     this.api = api;
-    this._data = {} as EmbedData;
+    this._data = {} as IframelyData;
     this.element = null;
     this.readOnly = readOnly;
 
@@ -105,30 +99,19 @@ export default class Embed {
   }
 
   /**
-   * @param {EmbedData} data - embed data
-   * @param {RegExp} [data.regex] - pattern of source URLs
-   * @param {string} [data.embedUrl] - URL scheme to embedded page. Use '<%= remote_id %>' to define a place to insert resource id
-   * @param {string} [data.html] - iframe which contains embedded content
-   * @param {number} [data.height] - iframe height
-   * @param {number} [data.width] - iframe width
-   * @param {string} [data.caption] - caption
-   * @param {string} [data.embedhtml] - html
+   * @param {IframelyData} data - iframely data
    */
-  set data(data: EmbedData) {
+  set data(data: IframelyData) {
     if (!(data instanceof Object)) {
-      throw Error('Embed Tool data should be object');
+      throw Error('Iframely Tool data should be object');
     }
 
-    const { service, source, embed, width, height, caption = '', embedhtml } = data;
-
     this._data = {
-      service: service || this.data.service,
-      source: source || this.data.source,
-      embed: embed || this.data.embed,
-      width: width || this.data.width,
-      height: height || this.data.height,
-      caption: caption || this.data.caption || '',
-      embedhtml: embedhtml || this.data.embedhtml
+      caption: data.caption || '',
+      html: data.html || '',
+      key: data.key || '',
+      provider: data.provider || '',
+      url: data.url || '',
     };
 
     const oldView = this.element;
@@ -139,9 +122,9 @@ export default class Embed {
   }
 
   /**
-   * @returns {EmbedData}
+   * @returns {IframelyData}
    */
-  get data(): EmbedData {
+  get data(): IframelyData {
     if (this.element) {
       const caption = this.element.querySelector(`.${this.api.styles.input}`) as HTMLElement;
 
@@ -160,138 +143,40 @@ export default class Embed {
     return {
       baseClass: this.api.styles.block,
       input: this.api.styles.input,
-      container: 'embed-tool',
-      containerLoading: 'embed-tool--loading',
-      preloader: 'embed-tool__preloader',
-      caption: 'embed-tool__caption',
-      url: 'embed-tool__url',
-      content: 'embed-tool__content',
+      container: 'iframely-tool',
+      containerLoading: 'iframely-tool--loading',
+      preloader: 'iframely-tool__preloader',
+      caption: 'iframely-tool__caption',
+      url: 'iframely-tool__url',
+      content: 'iframely-tool__content',
     };
   }
 
   /**
-   * Render Embed tool content
+   * Render Iframely tool content
    *
    * @returns {HTMLElement}
    */
   render(): HTMLElement {
-    if (!this.data.service) {
-      const container = document.createElement('div');
-
-      this.element = container;
-
-      return container;
-    }
-
-    const { html } = Embed.services[this.data.service];
     const container = document.createElement('div');
     const caption = document.createElement('div');
     const template = document.createElement('template');
-    const preloader = this.createPreloader();
 
-    container.classList.add(this.CSS.baseClass, this.CSS.container, this.CSS.containerLoading);
+    container.classList.add(this.CSS.baseClass, this.CSS.container);
     caption.classList.add(this.CSS.input, this.CSS.caption);
 
-    // Если сервис iframely и embed содержит html (а не ссылку) — рендерим embed как html
-    if (this.data.service === 'iframely' && this.data.embed && this.data.embed.startsWith('<')) {
-      console.log('[Embed] render: using embed as html');
-      template.innerHTML = this.data.embed;
-      if (template.content.firstChild) {
-        container.appendChild(template.content.firstChild);
-      }
-    } else if (this.data.embedhtml && this.data.embedhtml !== '1') {
-      // fallback для старых embedhtml
-      console.log('[Embed] render: using embedhtml');
-      template.innerHTML = this.data.embedhtml;
-      if (template.content.firstChild) {
-        container.appendChild(template.content.firstChild);
-      }
-    } else {
-      container.appendChild(preloader);
-      template.innerHTML = html;
-      if (template.content.firstChild) {
-        (template.content.firstChild as HTMLElement).setAttribute('src', this.data.embed);
-        (template.content.firstChild as HTMLElement).classList.add(this.CSS.content);
-        container.appendChild(template.content.firstChild);
-      }
-    }
+    template.innerHTML = this.data.html || '';
+
+    container.appendChild(template.content.firstChild || document.createElement('div'));
     caption.contentEditable = (!this.readOnly).toString();
     caption.dataset.placeholder = this.api.i18n.t('Enter a caption');
     caption.innerHTML = this.data.caption || '';
 
     container.appendChild(caption);
 
-    const embedIsReady = this.embedIsReady(container);
-
-    embedIsReady
-        .then(() => {
-          container.classList.remove(this.CSS.containerLoading);
-        });
-
     this.element = container;
 
     return container;
-  }
-
-  async handleIframelyFetch(url: string) {
-    const iframelyApiKey = '2142942481b218a645897e';
-    const apiUrl = `https://iframe.ly/api/iframely?url=${encodeURIComponent(url)}&api_key=${iframelyApiKey}&iframe=0`;
-    console.log('[Embed] iframely: fetch', apiUrl);
-    try {
-      const resp = await fetch(apiUrl);
-      const data = await resp.json();
-      if (data && data.html) {
-        console.log('[Embed] iframely: got html');
-        this.data = {
-          ...this.data,
-          embedhtml: data.html
-        };
-      } else {
-        console.warn('[Embed] iframely: no html in response', data);
-      }
-    } catch (err) {
-      console.error('[Embed] iframely: fetch error', err);
-    }
-  }
-
-  /**
-   * Creates preloader to append to container while data is loading
-   *
-   * @returns {HTMLElement}
-   */
-  createPreloader(): HTMLElement {
-    const preloader = document.createElement('preloader');
-    const url = document.createElement('div');
-
-    url.textContent = this.data.source;
-
-    preloader.classList.add(this.CSS.preloader);
-    url.classList.add(this.CSS.url);
-
-    preloader.appendChild(url);
-
-    return preloader;
-  }
-
-  /**
-   * Save current content and return EmbedData object
-   *
-   * @returns {EmbedData}
-   */
-  save(): EmbedData {
-    // Ensure caption is updated from the DOM before saving
-    const captionElement = this.element?.querySelector(`.${this.CSS.input}.${this.CSS.caption}`) as HTMLElement | null;
-    if (captionElement) {
-      this._data.caption = captionElement.innerHTML;
-    }
-    // Для iframely: embed = html, embedhtml = '1'
-    if (this._data.service === 'iframely' && this._data.embedhtml && this._data.embedhtml !== '1') {
-      this._data.embed = this._data.embedhtml;
-      this._data.embedhtml = '1';
-    }
-    const dataToSave = { ...this._data };
-    console.log('[Embed] save:', dataToSave);
-    return dataToSave;
   }
 
   /**
@@ -300,107 +185,79 @@ export default class Embed {
    * @param {PasteEvent} event - event with pasted data
    */
   onPaste(event: { detail: PatternPasteEventDetail }) {
-    const { key: service, data: url } = event.detail;
+    const { key, data: url } = event.detail;
 
-    const { regex, embedUrl, width, height, id = (ids) => ids.shift() || '' } = Embed.services[service];
-    const result = regex.exec(url)?.slice(1);
-    const embed = result ? embedUrl.replace(/<%= remote_id %>/g, id(result)) : '';
-
-    this.data = {
-      service,
-      source: url,
-      embed,
-      width,
-      height,
-    };
-
-    if (service === 'iframely') {
+    if (key === 'iframely') {
       this.handleIframelyFetch(url);
+    } else {
+      const service = Iframely.services[key];
+
+      if (service) {
+        this.data = {
+          key,
+          provider: service.provider,
+          url,
+          html: service.html,
+        };
+      }
     }
+  }
+
+  async handleIframelyFetch(url: string) {
+    const iframelyApiKey = '2142942481b218a645897e';
+    const apiUrl = `https://iframe.ly/api/iframely?url=${encodeURIComponent(url)}&api_key=${iframelyApiKey}&iframe=0`;
+    console.log('[Iframely] iframely: fetch', apiUrl);
+    try {
+      const resp = await fetch(apiUrl);
+      const data = await resp.json();
+      if (data && data.html) {
+        console.log('[Iframely] iframely: got html');
+        this.data = {
+          key: 'iframely',
+          provider: 'iframely',
+          url,
+          html: data.html,
+        };
+      } else {
+        console.warn('[Iframely] iframely: no html in response', data);
+      }
+    } catch (err) {
+      console.error('[Iframely] iframely: fetch error', err);
+    }
+  }
+
+  /**
+   * Save current content and return IframelyData object
+   *
+   * @returns {IframelyData}
+   */
+  save(): IframelyData {
+    // Ensure caption is updated from the DOM before saving
+    const captionElement = this.element?.querySelector(`.${this.CSS.input}.${this.CSS.caption}`) as HTMLElement | null;
+    if (captionElement) {
+      this._data.caption = captionElement.innerHTML;
+    }
+
+    console.log('[Iframely] save:', this._data);
+
+    return {
+      caption: this._data.caption,
+      html: this._data.html,
+      key: this._data.key,
+      provider: this._data.provider,
+      url: this._data.url,
+    };
   }
 
   /**
    * Analyze provided config and make object with services to use
    *
-   * @param {EmbedConfig} config - configuration of embed block element
+   * @param {IframelyConfig} config - configuration of iframely block element
    */
-  static prepare({ config = {} } : {config: EmbedConfig}) {
+  static prepare({ config = {} } : {config: IframelyConfig}) {
     const { services = {} } = config;
 
-    let entries = Object.entries(SERVICES);
-
-    const enabledServices = Object
-        .entries(services)
-        .filter(([key, value]) => {
-          return typeof value === 'boolean' && value === true;
-        })
-        .map(([ key ]) => key);
-
-    const userServices = Object
-        .entries(services)
-        .filter(([key, value]) => {
-          return typeof value === 'object';
-        })
-        .filter(([key, service]) => Embed.checkServiceConfig(service as ServiceConfig))
-        .map(([key, service]) => {
-          const { regex, embedUrl, html, height, width, id } = service as ServiceConfig;
-
-          return [key, {
-            regex,
-            embedUrl,
-            html,
-            height,
-            width,
-            id,
-          } ] as [string, ServiceConfig];
-        });
-
-    if (enabledServices.length) {
-      entries = entries.filter(([ key ]) => enabledServices.includes(key));
-    }
-
-    entries = entries.concat(userServices);
-
-    Embed.services = entries.reduce<{ [key: string]: ServiceConfig }>((result, [key, service]) => {
-      if (!(key in result)) {
-        result[key] = service as ServiceConfig;
-
-        return result;
-      }
-
-      result[key] = Object.assign({}, result[key], service);
-
-      return result;
-    }, {});
-
-    Embed.patterns = entries
-        .reduce<{ [key: string]: RegExp }>((result, [key, item]) => {
-          if (item && typeof item !== 'boolean') {
-            result[key] = (item as ServiceConfig).regex as RegExp;
-          }
-
-          return result;
-        }, {});
-  }
-
-  /**
-   * Check if Service config is valid
-   *
-   * @param {Service} config - configuration of embed block element
-   * @returns {boolean}
-   */
-  static checkServiceConfig(config: ServiceConfig): boolean {
-    const { regex, embedUrl, html, height, width, id } = config;
-
-    let isValid = Boolean(regex && regex instanceof RegExp) &&
-        Boolean(embedUrl && typeof embedUrl === 'string') &&
-        Boolean(html && typeof html === 'string');
-
-    isValid = isValid && (id !== undefined ? id instanceof Function : true);
-    isValid = isValid && (height !== undefined ? Number.isFinite(height) : true);
-    isValid = isValid && (width !== undefined ? Number.isFinite(width) : true);
-
-    return isValid;
+    Iframely.services = services;
   }
 
   /**
@@ -410,7 +267,7 @@ export default class Embed {
    */
   static get pasteConfig() {
     return {
-      patterns: Embed.patterns,
+      patterns: Iframely.patterns,
     };
   }
 
@@ -421,27 +278,5 @@ export default class Embed {
    */
   static get isReadOnlySupported() {
     return true;
-  }
-
-  /**
-   * Checks that mutations in DOM have finished after appending iframe content
-   *
-   * @param {HTMLElement} targetNode - HTML-element mutations of which to listen
-   * @returns {Promise<any>} - result that all mutations have finished
-   */
-  embedIsReady(targetNode: HTMLElement): Promise<void> {
-    const PRELOADER_DELAY = 450;
-
-    let observer: MutationObserver;
-
-    return new Promise((resolve, reject) => {
-      observer = new MutationObserver(debounce(resolve, PRELOADER_DELAY));
-      observer.observe(targetNode, {
-        childList: true,
-        subtree: true,
-      });
-    }).then(() => {
-      observer.disconnect();
-    });
   }
 }
