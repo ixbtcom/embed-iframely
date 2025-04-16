@@ -105,11 +105,7 @@ export default class Embed {
   constructor({ data, config, api, readOnly }: ConstructorArgs) {
     this.api = api;
     this.config = config; // Store config
-    this._data = {
-      service: data.service || '', // Ensure service is initialized
-      source: data.source || '',   // Ensure source is initialized
-      ...data,
-    };
+    this._data = { ...data } as EmbedData;
     this.element = null;
     this.readOnly = readOnly;
   }
@@ -124,25 +120,9 @@ export default class Embed {
    * @param {string} [data.caption] - caption
    */
   set data(data: EmbedData) {
-    // Allow setting partial data, especially during fetching
-    // if (!(data instanceof Object)) {
-    //   throw Error('Embed Tool data should be object');
-    // }
-
     // Merge new data with existing data
     const newData = { ...this._data, ...data };
-    const { service, source, embed, width, height, caption = '', html, needsFetching } = newData;
-
-    this._data = {
-      service,
-      source,
-      embed,
-      width,
-      height,
-      caption,
-      html, // Store HTML
-      needsFetching, // Store fetch flag
-    };
+    this._data = { ...newData };
 
     const oldView = this.element;
 
@@ -175,6 +155,13 @@ export default class Embed {
    * @returns {HTMLElement}
    */
   render(): HTMLElement {
+    // Защита от некорректных данных
+    if (!this.data || !this.data.service) {
+      const container = document.createElement('div');
+      container.textContent = 'Invalid embed data';
+      return container;
+    }
+
     // Initial render or re-render
 
     // Handle case where service is Iframely and needs fetching
@@ -456,29 +443,25 @@ export default class Embed {
 
     entries = entries.concat(userServices);
 
-    const result = entries.reduce<{ [key: string]: ServiceConfig }>((result, [key, service]) => {
-      if (!(key in result)) {
-        result[key] = service as ServiceConfig;
+    const result: { [key: string]: ServiceConfig } = {};
 
-        return result;
+    // Сначала стандартные сервисы
+    Object.entries(SERVICES).forEach(([key, val]) => {
+      if (userServices.find(([k, v]) => k === key)) {
+        result[key] = userServices.find(([k, v]) => k === key)?.[1] as ServiceConfig;
+      } else if (enabledServices.includes(key)) {
+        result[key] = val as ServiceConfig;
       }
+    });
 
-      result[key] = Object.assign({}, result[key], service);
-
-      return result;
-    }, {});
-
-    // Add our custom Iframely service if API key is provided
-    if (iframelyApiKey) {
+    // Потом iframelyService, если включен
+    if (iframelyApiKey && userServices.find(([k, v]) => k === 'iframelyService')) {
       result['iframelyService'] = {
-        // Match any http/https URL. Adjust if needed.
-        regex: /^(http|https):\/\/.+/,
-        useIframelyAPI: true, // Our custom flag
-        embedUrl: '', // Dummy value to satisfy ServiceConfig type
-        // No embedUrl or html needed here
-        // Provide dummy html structure for initial render if needed?
-        html: '<div class="cdx-block embed-tool__content"></div>' // Basic placeholder
-      } as ServiceConfig; // Cast needed?
+        regex: /^https?:\/\/.+/, // Match any http/https URL
+        useIframelyAPI: true, // Custom flag
+        embedUrl: '', // Dummy value
+        html: '<div class="cdx-block embed-tool__content"></div>'
+      } as ServiceConfig;
     }
 
     Embed.services = result;
