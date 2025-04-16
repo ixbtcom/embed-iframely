@@ -165,16 +165,12 @@ export default class Embed {
     // Initial render or re-render
 
     // Handle case where service is Iframely and needs fetching
-    if (this.data.service === 'iframelyService' && this.data.needsFetching) {
+    if ((this.data.service === 'iframelyService' || this.data.service === 'iframelyRuSocial') && this.data.needsFetching) {
       const container = document.createElement('div');
       container.classList.add(this.CSS.baseClass, this.CSS.container, this.CSS.containerLoading);
-      const preloader = this.createPreloader(); // Use existing preloader
-      container.appendChild(preloader);
+      container.appendChild(this.createPreloader());
       this.element = container;
-
-      // Trigger async fetch, do not block render
-      this.fetchIframelyData(this.data.source || '');
-
+      this.fetchIframelyData(this.data.source);
       return container;
     }
 
@@ -292,7 +288,7 @@ export default class Embed {
    * - For others, check if service and source/embed are present.
    */
   validate(savedData: EmbedData): boolean {
-    if (savedData.service === 'iframelyService') {
+    if (savedData.service === 'iframelyService' || savedData.service === 'iframelyRuSocial') {
       const isValid = typeof savedData.source === 'string' && savedData.source.length > 0 &&
                       typeof savedData.html === 'string' && savedData.html.length > 0;
       if (!isValid) {
@@ -320,15 +316,26 @@ export default class Embed {
     const { key: serviceKey, data: url } = event.detail;
     const service = Embed.services[serviceKey];
 
-    if (service.useIframelyAPI) {
-      console.log('Pasted URL will be handled by Iframely:', url);
+    if (serviceKey === 'iframelyRuSocial') {
+      // Обработка через Iframely
       this.data = {
         service: serviceKey,
         source: url,
-        embed: '', // Will be fetched
-        html: '',  // Will be fetched
-        needsFetching: true, // Add a flag to trigger fetch in render
-      } as EmbedData; // Cast to EmbedData, maybe add needsFetching to EmbedData interface?
+        embed: '',
+        html: '',
+        needsFetching: true,
+      } as EmbedData;
+      return;
+    }
+
+    if (service.useIframelyAPI) {
+      this.data = {
+        service: serviceKey,
+        source: url,
+        embed: '',
+        html: '',
+        needsFetching: true,
+      } as EmbedData;
     } else {
       // Original logic for standard services
       const { regex, embedUrl, width, height, id = (ids) => ids.shift() || '' } = service;
