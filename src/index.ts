@@ -1,4 +1,3 @@
-import servicesConfig from './services.js';
 import './index.css';
 import { debounce } from 'debounce';
 import type { API, PatternPasteEventDetail } from '@editorjs/editorjs';
@@ -79,7 +78,23 @@ export default class Iframely {
   /** Read-only mode flag */
   private readOnly: boolean;
   /** Static property with available services */
-  static services: { [key: string]: any };
+  static services = {
+    youtube: {
+      regex: /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/,
+    },
+    instagram: {
+      regex: /^https?:\/\/(www\.)?instagram\.com\/p\/([a-zA-Z0-9_-]+)\/?$/,
+    },
+    twitter: {
+      regex: /^https?:\/\/twitter\.com\/[a-zA-Z0-9_]+\/status\/([0-9]+)$/,
+    },
+    facebook: {
+      regex: /^https?:\/\/(www\.)?facebook\.com\/([a-zA-Z0-9_]+)\/posts\/([0-9]+)$/,
+    },
+    tiktok: {
+      regex: /^https?:\/\/(www\.)?tiktok\.com\/@[a-zA-Z0-9_]+\/video\/([0-9]+)$/,
+    },
+  };
   /** Static property with patterns for paste handling configuration */
   static patterns: { [key: string]: RegExp };
   /**
@@ -188,7 +203,7 @@ export default class Iframely {
     const url = event.detail.data;
     let provider = null;
     let key = null;
-    for (const [service, config] of Object.entries(servicesConfig)) {
+    for (const [service, config] of Object.entries(Iframely.services)) {
       if (typeof config !== 'object' || !config.regex) continue;
       const match = config.regex.exec(url);
       if (match) {
@@ -241,17 +256,6 @@ export default class Iframely {
       provider: this._data.provider,
       url: this._data.url,
     };
-  }
-
-  /**
-   * Analyze provided config and make object with services to use
-   *
-   * @param {IframelyConfig} config - configuration of iframely block element
-   */
-  static prepare({ config = {} } : {config: IframelyConfig}) {
-    const { services = {} } = config;
-
-    Iframely.services = services;
   }
 
   /**
