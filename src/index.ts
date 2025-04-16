@@ -192,18 +192,13 @@ export default class Embed {
     container.classList.add(this.CSS.baseClass, this.CSS.container, this.CSS.containerLoading);
     caption.classList.add(this.CSS.input, this.CSS.caption);
 
-    container.appendChild(preloader);
-
-    caption.contentEditable = (!this.readOnly).toString();
-    caption.dataset.placeholder = this.api.i18n.t('Enter a caption');
-    caption.innerHTML = this.data.caption || '';
-
-    if (this.data.service === 'iframely' && this.data.embedhtml) {
+    if (this.data.embedhtml) {
       template.innerHTML = this.data.embedhtml;
       if (template.content.firstChild) {
         container.appendChild(template.content.firstChild);
       }
     } else {
+      container.appendChild(preloader);
       template.innerHTML = html;
       if (template.content.firstChild) {
         (template.content.firstChild as HTMLElement).setAttribute('src', this.data.embed);
@@ -211,6 +206,10 @@ export default class Embed {
         container.appendChild(template.content.firstChild);
       }
     }
+    caption.contentEditable = (!this.readOnly).toString();
+    caption.dataset.placeholder = this.api.i18n.t('Enter a caption');
+    caption.innerHTML = this.data.caption || '';
+
     container.appendChild(caption);
 
     const embedIsReady = this.embedIsReady(container);
@@ -227,7 +226,7 @@ export default class Embed {
 
   async handleIframelyFetch(url: string) {
     const iframelyApiKey = '2142942481b218a645897e';
-    const apiUrl = `https://iframe.ly/api/iframely?url=${encodeURIComponent(url)}&api_key=${iframelyApiKey}`;
+    const apiUrl = `https://iframe.ly/api/iframely?url=${encodeURIComponent(url)}&api_key=${iframelyApiKey}&iframe=0`;
     console.log('[Embed] iframely: fetch', apiUrl);
     try {
       const resp = await fetch(apiUrl);
@@ -238,7 +237,6 @@ export default class Embed {
           ...this.data,
           embedhtml: data.html
         };
-        this.rerender();
       } else {
         console.warn('[Embed] iframely: no html in response', data);
       }
@@ -297,14 +295,6 @@ export default class Embed {
 
     if (service === 'iframely') {
       this.handleIframelyFetch(url);
-    }
-  }
-
-  rerender() {
-    if (this.element && this.element.parentNode) {
-      const newEl = this.render();
-      this.element.parentNode.replaceChild(newEl, this.element);
-      this.element = newEl;
     }
   }
 
