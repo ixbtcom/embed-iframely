@@ -198,16 +198,22 @@ export default class Embed {
     caption.dataset.placeholder = this.api.i18n.t('Enter a caption');
     caption.innerHTML = this.data.caption || '';
 
-    template.innerHTML = html;
-    (template.content.firstChild as HTMLElement).setAttribute('src', this.data.embed);
-    (template.content.firstChild as HTMLElement).classList.add(this.CSS.content);
-
-    const embedIsReady = this.embedIsReady(container);
-
-    if (template.content.firstChild) {
-      container.appendChild(template.content.firstChild);
+    if (this.data.service === 'iframely' && this.data.embedhtml) {
+      template.innerHTML = this.data.embedhtml;
+      if (template.content.firstChild) {
+        container.appendChild(template.content.firstChild);
+      }
+    } else {
+      template.innerHTML = html;
+      if (template.content.firstChild) {
+        (template.content.firstChild as HTMLElement).setAttribute('src', this.data.embed);
+        (template.content.firstChild as HTMLElement).classList.add(this.CSS.content);
+        container.appendChild(template.content.firstChild);
+      }
     }
     container.appendChild(caption);
+
+    const embedIsReady = this.embedIsReady(container);
 
     embedIsReady
         .then(() => {
@@ -217,6 +223,28 @@ export default class Embed {
     this.element = container;
 
     return container;
+  }
+
+  async handleIframelyFetch(url: string) {
+    const iframelyApiKey = '2142942481b218a645897e';
+    const apiUrl = `https://iframe.ly/api/iframely?url=${encodeURIComponent(url)}&key=${iframelyApiKey}`;
+    console.log('[Embed] iframely: fetch', apiUrl);
+    try {
+      const resp = await fetch(apiUrl);
+      const data = await resp.json();
+      if (data && data.html) {
+        console.log('[Embed] iframely: got html');
+        this.data = {
+          ...this.data,
+          embedhtml: data.html
+        };
+        this.rerender();
+      } else {
+        console.warn('[Embed] iframely: no html in response', data);
+      }
+    } catch (err) {
+      console.error('[Embed] iframely: fetch error', err);
+    }
   }
 
   /**
@@ -255,16 +283,10 @@ export default class Embed {
   onPaste(event: { detail: PatternPasteEventDetail }) {
     const { key: service, data: url } = event.detail;
 
-
     const { regex, embedUrl, width, height, id = (ids) => ids.shift() || '' } = Embed.services[service];
-
-
     const result = regex.exec(url)?.slice(1);
     const embed = result ? embedUrl.replace(/<%= remote_id %>/g, id(result)) : '';
 
-    console.log(service);
-    console.log(url);
-    console.log(embed);
     this.data = {
       service,
       source: url,
@@ -272,6 +294,18 @@ export default class Embed {
       width,
       height,
     };
+
+    if (service === 'iframely') {
+      this.handleIframelyFetch(url);
+    }
+  }
+
+  rerender() {
+    if (this.element && this.element.parentNode) {
+      const newEl = this.render();
+      this.element.parentNode.replaceChild(newEl, this.element);
+      this.element = newEl;
+    }
   }
 
   /**
