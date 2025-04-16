@@ -108,6 +108,8 @@ export default class Embed {
     this._data = { ...data } as EmbedData;
     this.element = null;
     this.readOnly = readOnly;
+    // Логируем наличие и значение ключа Iframely
+    console.log('[Embed] iframelyApiKey:', this.config.iframelyApiKey);
   }
 
   /**
@@ -313,7 +315,9 @@ export default class Embed {
    * @param {PasteEvent} event - event with pasted data
    */
   onPaste(event: { detail: PatternPasteEventDetail }): void {
+    console.log('[Embed] onPaste event:', event);
     const { key: serviceKey, data: url } = event.detail;
+    console.log('[Embed] onPaste: serviceKey =', serviceKey, 'url =', url);
     const service = Embed.services[serviceKey];
 
     if (serviceKey === 'iframelyRuSocial') {
@@ -365,18 +369,19 @@ export default class Embed {
 
     const apiUrl = `https://iframe.ly/api/iframely?url=${encodeURIComponent(sourceUrl)}&key=${this.config.iframelyApiKey}`;
 
-    console.log('Fetching Iframely data from:', apiUrl);
+    console.log('[Embed] Fetching Iframely data from:', apiUrl);
 
     try {
       const response = await fetch(apiUrl);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Iframely API Error:', response.status, errorText);
+        console.error('[Embed] Iframely API error:', response.status, errorText);
         throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('[Embed] Iframely API response:', data);
 
       if (!data || !data.html) {
         console.warn('Iframely API returned no HTML for URL:', sourceUrl, 'Response:', data);
