@@ -193,6 +193,7 @@ export default class Embed {
     caption.classList.add(this.CSS.input, this.CSS.caption);
 
     if (this.data.embedhtml) {
+      console.log('[Embed] render: using embedhtml');
       template.innerHTML = this.data.embedhtml;
       if (template.content.firstChild) {
         container.appendChild(template.content.firstChild);
@@ -270,7 +271,15 @@ export default class Embed {
    * @returns {EmbedData}
    */
   save(): EmbedData {
-    return this.data;
+    // Ensure caption is updated from the DOM before saving
+    const captionElement = this.element?.querySelector(`.${this.CSS.input}.${this.CSS.caption}`) as HTMLElement | null;
+    if (captionElement) {
+      this._data.caption = captionElement.innerHTML;
+    }
+    // Возвращаем embedhtml вместе с остальными данными
+    const dataToSave = { ...this._data };
+    console.log('[Embed] save:', dataToSave);
+    return dataToSave;
   }
 
   /**
