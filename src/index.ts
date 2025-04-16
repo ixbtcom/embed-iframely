@@ -1,4 +1,4 @@
-import SERVICES from './services';
+import servicesConfig from './services.js';
 import './index.css';
 import { debounce } from 'debounce';
 import type { API, PatternPasteEventDetail } from '@editorjs/editorjs';
@@ -184,26 +184,23 @@ export default class Iframely {
    *
    * @param {PasteEvent} event - event with pasted data
    */
-  onPaste(event: { detail: PatternPasteEventDetail }) {
-    const { key, data: url } = event.detail;
-
-    if (key === 'iframely') {
-      this.handleIframelyFetch(url);
-    } else {
-      const service = Iframely.services[key];
-
-      if (service) {
-        this.data = {
-          key,
-          provider: service.provider,
-          url,
-          html: service.html,
-        };
+  onPaste(event: { detail: { data: string } }) {
+    const url = event.detail.data;
+    let provider = null;
+    let key = null;
+    for (const [service, config] of Object.entries(servicesConfig)) {
+      if (typeof config !== 'object' || !config.regex) continue;
+      const match = config.regex.exec(url);
+      if (match) {
+        provider = service;
+        key = match[1] || null;
+        break;
       }
     }
+    this.handleIframelyFetch(url, provider, key);
   }
 
-  async handleIframelyFetch(url: string) {
+  async handleIframelyFetch(url: string, provider: string|null, key: string|null) {
     const iframelyApiKey = '2142942481b218a645897e';
     const apiUrl = `https://iframe.ly/api/iframely?url=${encodeURIComponent(url)}&api_key=${iframelyApiKey}&iframe=0`;
     console.log('[Iframely] iframely: fetch', apiUrl);
@@ -213,10 +210,11 @@ export default class Iframely {
       if (data && data.html) {
         console.log('[Iframely] iframely: got html');
         this.data = {
-          key: 'iframely',
-          provider: 'iframely',
-          url,
+          caption: '',
           html: data.html,
+          key: key || '',
+          provider: provider || '',
+          url,
         };
       } else {
         console.warn('[Iframely] iframely: no html in response', data);
@@ -231,15 +229,11 @@ export default class Iframely {
    *
    * @returns {IframelyData}
    */
-  save(): IframelyData {
-    // Ensure caption is updated from the DOM before saving
+  save() {
     const captionElement = this.element?.querySelector(`.${this.CSS.input}.${this.CSS.caption}`) as HTMLElement | null;
     if (captionElement) {
       this._data.caption = captionElement.innerHTML;
     }
-
-    console.log('[Iframely] save:', this._data);
-
     return {
       caption: this._data.caption,
       html: this._data.html,
