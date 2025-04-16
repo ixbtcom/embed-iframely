@@ -192,7 +192,15 @@ export default class Embed {
     container.classList.add(this.CSS.baseClass, this.CSS.container, this.CSS.containerLoading);
     caption.classList.add(this.CSS.input, this.CSS.caption);
 
-    if (this.data.embedhtml) {
+    // Если сервис iframely и embed содержит html (а не ссылку) — рендерим embed как html
+    if (this.data.service === 'iframely' && this.data.embed && this.data.embed.startsWith('<')) {
+      console.log('[Embed] render: using embed as html');
+      template.innerHTML = this.data.embed;
+      if (template.content.firstChild) {
+        container.appendChild(template.content.firstChild);
+      }
+    } else if (this.data.embedhtml && this.data.embedhtml !== '1') {
+      // fallback для старых embedhtml
       console.log('[Embed] render: using embedhtml');
       template.innerHTML = this.data.embedhtml;
       if (template.content.firstChild) {
@@ -276,7 +284,11 @@ export default class Embed {
     if (captionElement) {
       this._data.caption = captionElement.innerHTML;
     }
-    // Возвращаем embedhtml вместе с остальными данными
+    // Для iframely: embed = html, embedhtml = '1'
+    if (this._data.service === 'iframely' && this._data.embedhtml && this._data.embedhtml !== '1') {
+      this._data.embed = this._data.embedhtml;
+      this._data.embedhtml = '1';
+    }
     const dataToSave = { ...this._data };
     console.log('[Embed] save:', dataToSave);
     return dataToSave;
