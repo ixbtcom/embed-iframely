@@ -174,23 +174,81 @@ export default class Iframely {
    */
   render(): HTMLElement {
     const container = document.createElement('div');
-    const caption = document.createElement('div');
-    const template = document.createElement('template');
-
     container.classList.add(this.CSS.baseClass, this.CSS.container);
-    caption.classList.add(this.CSS.input, this.CSS.caption);
 
+    // Если нет html, показываем поле для ввода ссылки
+    if (!this.data.html) {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = 'Вставьте ссылку на пост, видео и т.д.';
+      input.className = 'cdx-input';
+      input.value = this.data.url || '';
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = 'Вставить';
+      button.className = 'cdx-button';
+      const error = document.createElement('div');
+      error.style.color = 'red';
+      error.style.marginTop = '8px';
+      error.style.fontSize = '13px';
+
+      const onSubmit = async () => {
+        const url = input.value.trim();
+        if (!url) return;
+        error.textContent = '';
+        button.disabled = true;
+        button.textContent = 'Загрузка...';
+        try {
+          let provider = null;
+          let key = null;
+          for (const [service, config] of Object.entries(Iframely.services)) {
+            if (typeof config !== 'object' || !config.regex) continue;
+            const match = config.regex.exec(url);
+            if (match) {
+              provider = service;
+              key = match[1] || null;
+              break;
+            }
+          }
+          await this.handleIframelyFetch(url, provider, key);
+          if (this.data.html) {
+            // Перерисовать блок
+            const newNode = this.render();
+            container.replaceWith(newNode);
+          } else {
+            error.textContent = 'Не удалось получить embed-код для этой ссылки.';
+          }
+        } catch (e) {
+          error.textContent = 'Ошибка: ' + (e.message || e);
+        } finally {
+          button.disabled = false;
+          button.textContent = 'Вставить';
+        }
+      };
+      button.onclick = onSubmit;
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onSubmit();
+        }
+      };
+      container.appendChild(input);
+      container.appendChild(button);
+      container.appendChild(error);
+      return container;
+    }
+
+    // Если html уже есть — рендерим embed и caption
+    const template = document.createElement('template');
     template.innerHTML = this.data.html || '';
-
     container.appendChild(template.content.firstChild || document.createElement('div'));
+    const caption = document.createElement('div');
+    caption.classList.add(this.CSS.input, this.CSS.caption);
     caption.contentEditable = (!this.readOnly).toString();
     caption.dataset.placeholder = this.api.i18n.t('Enter a caption');
     caption.innerHTML = this.data.caption || '';
-
     container.appendChild(caption);
-
     this.element = container;
-
     return container;
   }
 
