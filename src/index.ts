@@ -157,6 +157,7 @@ export default class Embed {
    * @returns {HTMLElement}
    */
   render(): HTMLElement {
+    console.log('[Embed] render data:', this.data);
     // Защита от некорректных данных
     if (!this.data || !this.data.service) {
       const container = document.createElement('div');
@@ -164,9 +165,7 @@ export default class Embed {
       return container;
     }
 
-    // Initial render or re-render
-
-    // Handle case where service is Iframely and needs fetching
+    // Для iframelyRuSocial и iframelyService вызываем fetchIframelyData
     if ((this.data.service === 'iframelyService' || this.data.service === 'iframelyRuSocial') && this.data.needsFetching) {
       const container = document.createElement('div');
       container.classList.add(this.CSS.baseClass, this.CSS.container, this.CSS.containerLoading);
@@ -176,74 +175,35 @@ export default class Embed {
       return container;
     }
 
-    // Handle case where service is Iframely and data is fetched (or failed)
-    if (this.data.service === 'iframelyService' && this.data.html) {
-      const container = document.createElement('div');
-      container.classList.add(this.CSS.baseClass, this.CSS.container);
-
-      // Create content element (e.g., a div to hold the raw HTML)
-      const content = document.createElement('div');
-      content.classList.add(this.CSS.content);
-      content.innerHTML = this.data.html;
-
-      // Create caption element
-      const caption = document.createElement('div');
-      caption.classList.add(this.CSS.input, this.CSS.caption);
-      caption.contentEditable = (!this.readOnly).toString();
-      caption.dataset.placeholder = this.api.i18n.t('Enter a caption');
-      caption.innerHTML = this.data.caption || '';
-
-      container.appendChild(content);
-      container.appendChild(caption);
-
-      this.element = container;
-      return container;
-    }
-
-    // Original logic for standard services or initial empty state
-    if (!this.data.service) {
-      const container = document.createElement('div');
-
-      this.element = container;
-
-      return container;
-    }
-
-    const { html } = Embed.services[this.data.service];
+    // Стандартный рендер для обычных сервисов
     const container = document.createElement('div');
+    container.classList.add(this.CSS.baseClass, this.CSS.container);
     const caption = document.createElement('div');
-    const template = document.createElement('template');
-    const preloader = this.createPreloader();
-
-    container.classList.add(this.CSS.baseClass, this.CSS.container, this.CSS.containerLoading);
     caption.classList.add(this.CSS.input, this.CSS.caption);
-
-    container.appendChild(preloader);
-
     caption.contentEditable = (!this.readOnly).toString();
     caption.dataset.placeholder = this.api.i18n.t('Enter a caption');
     caption.innerHTML = this.data.caption || '';
 
-    template.innerHTML = html;
-    if (this.data.embed && template.content.firstChild instanceof HTMLElement) {
-      (template.content.firstChild as HTMLElement).setAttribute('src', this.data.embed);
-    }
-    (template.content.firstChild as HTMLElement).classList.add(this.CSS.content);
-
-    const embedIsReady = this.embedIsReady(container);
-
-    if (template.content.firstChild) {
-      container.appendChild(template.content.firstChild);
+    if (this.data.html) {
+      // Если есть готовый HTML (Iframely)
+      const template = document.createElement('template');
+      template.innerHTML = this.data.html;
+      if (template.content.firstChild) {
+        container.appendChild(template.content.firstChild);
+      }
+    } else if (this.data.embed) {
+      // Обычный iframe embed
+      const iframe = document.createElement('iframe');
+      iframe.src = this.data.embed;
+      iframe.width = (this.data.width || 580).toString();
+      iframe.height = (this.data.height || 320).toString();
+      iframe.frameBorder = '0';
+      iframe.allowFullscreen = true;
+      iframe.style.width = '100%';
+      container.appendChild(iframe);
     }
     container.appendChild(caption);
-
-    embedIsReady
-      .then(() => {
-        container.classList.remove(this.CSS.containerLoading);
-      });
-
     this.element = container;
-
     return container;
   }
 
@@ -298,7 +258,7 @@ export default class Embed {
       }
       return isValid;
     } else {
-      // Original validation logic (implicitly done by checking service and source/embed)
+      // Оригинальная логика для стандартных сервисов
       const isValid = typeof savedData.service === 'string' && savedData.service.length > 0 &&
                       (typeof savedData.source === 'string' && savedData.source.length > 0 ||
                        typeof savedData.embed === 'string' && savedData.embed.length > 0);
@@ -329,6 +289,7 @@ export default class Embed {
         html: '',
         needsFetching: true,
       } as EmbedData;
+      console.log('[Embed] after onPaste, data:', this.data);
       return;
     }
 
@@ -340,8 +301,9 @@ export default class Embed {
         html: '',
         needsFetching: true,
       } as EmbedData;
+      console.log('[Embed] after onPaste, data:', this.data);
     } else {
-      // Original logic for standard services
+      // Оригинальная логика
       const { regex, embedUrl, width, height, id = (ids) => ids.shift() || '' } = service;
       const result = regex.exec(url)?.slice(1);
       const embed = result ? embedUrl.replace(/<%= remote_id %>/g, id(result)) : '';
@@ -353,6 +315,7 @@ export default class Embed {
         width,
         height,
       };
+      console.log('[Embed] after onPaste, data:', this.data);
     }
   }
 
