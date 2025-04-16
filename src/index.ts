@@ -20,6 +20,9 @@ export interface EmbedData {
   height?: number;
   /** Content caption */
   caption?: string;
+
+  /** Embed html */
+  embedhtml?: string;
 }
 
 /**
@@ -109,13 +112,14 @@ export default class Embed {
    * @param {number} [data.height] - iframe height
    * @param {number} [data.width] - iframe width
    * @param {string} [data.caption] - caption
+   * @param {string} [data.embedhtml] - html
    */
   set data(data: EmbedData) {
     if (!(data instanceof Object)) {
       throw Error('Embed Tool data should be object');
     }
 
-    const { service, source, embed, width, height, caption = '' } = data;
+    const { service, source, embed, width, height, caption = '', embedhtml } = data;
 
     this._data = {
       service: service || this.data.service,
@@ -124,6 +128,7 @@ export default class Embed {
       width: width || this.data.width,
       height: height || this.data.height,
       caption: caption || this.data.caption || '',
+      embedhtml: embedhtml || this.data.embedhtml
     };
 
     const oldView = this.element;
@@ -250,10 +255,16 @@ export default class Embed {
   onPaste(event: { detail: PatternPasteEventDetail }) {
     const { key: service, data: url } = event.detail;
 
+
     const { regex, embedUrl, width, height, id = (ids) => ids.shift() || '' } = Embed.services[service];
+
+
     const result = regex.exec(url)?.slice(1);
     const embed = result ? embedUrl.replace(/<%= remote_id %>/g, id(result)) : '';
 
+    console.log(service);
+    console.log(url);
+    console.log(embed);
     this.data = {
       service,
       source: url,
