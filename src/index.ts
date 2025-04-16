@@ -280,8 +280,7 @@ export default class Embed {
     console.log('[Embed] onPaste: serviceKey =', serviceKey, 'url =', url);
     const service = Embed.services[serviceKey];
 
-    if (serviceKey === 'iframelyRuSocial') {
-      // Обработка через Iframely
+    if (service && service.useIframelyAPI) {
       this.data = {
         service: serviceKey,
         source: url,
@@ -293,30 +292,19 @@ export default class Embed {
       return;
     }
 
-    if (service.useIframelyAPI) {
-      this.data = {
-        service: serviceKey,
-        source: url,
-        embed: '',
-        html: '',
-        needsFetching: true,
-      } as EmbedData;
-      console.log('[Embed] after onPaste, data:', this.data);
-    } else {
-      // Оригинальная логика
-      const { regex, embedUrl, width, height, id = (ids) => ids.shift() || '' } = service;
-      const result = regex.exec(url)?.slice(1);
-      const embed = result ? embedUrl.replace(/<%= remote_id %>/g, id(result)) : '';
+    // Оригинальная логика для стандартных сервисов
+    const { regex, embedUrl, width, height, id = (ids) => ids.shift() || '' } = service;
+    const result = regex.exec(url)?.slice(1);
+    const embed = result ? embedUrl.replace(/<%= remote_id %>/g, id(result)) : '';
 
-      this.data = {
-        service: serviceKey,
-        source: url,
-        embed,
-        width,
-        height,
-      };
-      console.log('[Embed] after onPaste, data:', this.data);
-    }
+    this.data = {
+      service: serviceKey,
+      source: url,
+      embed,
+      width,
+      height,
+    };
+    console.log('[Embed] after onPaste, data:', this.data);
   }
 
   /**
