@@ -266,6 +266,10 @@ export default class Iframely {
           url,
         };
         console.log('[Iframely] this._data after fetch', this._data);
+        // после получения html и this._data обновлён
+        if (window && window.dispatchEvent) {
+          window.dispatchEvent(new CustomEvent('iframely-html-ready'));
+        }
       } else {
         console.warn('[Iframely] iframely: no html in response', data);
       }
