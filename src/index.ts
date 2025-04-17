@@ -110,17 +110,6 @@ export default class Iframely {
     this.element = null;
     this.readOnly = readOnly;
 
-    this.data = data;
-  }
-
-  /**
-   * @param {IframelyData} data - iframely data
-   */
-  set data(data: IframelyData) {
-    if (!(data instanceof Object)) {
-      throw Error('Iframely Tool data should be object');
-    }
-
     this._data = {
       caption: data.caption || '',
       html: data.html || '',
@@ -128,25 +117,6 @@ export default class Iframely {
       provider: data.provider || '',
       url: data.url || '',
     };
-
-    const oldView = this.element;
-
-    if (oldView) {
-      oldView.parentNode?.replaceChild(this.render(), oldView);
-    }
-  }
-
-  /**
-   * @returns {IframelyData}
-   */
-  get data(): IframelyData {
-    if (this.element) {
-      const caption = this.element.querySelector(`.${this.api.styles.input}`) as HTMLElement;
-
-      this._data.caption = caption ? caption.innerHTML : '';
-    }
-
-    return this._data;
   }
 
   /**
@@ -177,12 +147,12 @@ export default class Iframely {
     container.classList.add(this.CSS.baseClass, this.CSS.container);
 
     // Если нет html, показываем поле для ввода ссылки
-    if (!this.data.html) {
+    if (!this._data.html) {
       const input = document.createElement('input');
       input.type = 'text';
       input.placeholder = 'Вставьте ссылку на пост, видео и т.д.';
       input.className = 'cdx-input';
-      input.value = this.data.url || '';
+      input.value = this._data.url || '';
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = 'Вставить';
@@ -211,7 +181,7 @@ export default class Iframely {
             }
           }
           await this.handleIframelyFetch(url, provider, key);
-          if (this.data.html) {
+          if (this._data.html) {
             // Перерисовать блок
             const newNode = this.render();
             container.replaceWith(newNode);
@@ -240,13 +210,13 @@ export default class Iframely {
 
     // Если html уже есть — рендерим embed и caption
     const template = document.createElement('template');
-    template.innerHTML = this.data.html || '';
+    template.innerHTML = this._data.html || '';
     container.appendChild(template.content.firstChild || document.createElement('div'));
     const caption = document.createElement('div');
     caption.classList.add(this.CSS.input, this.CSS.caption);
     caption.contentEditable = (!this.readOnly).toString();
     caption.dataset.placeholder = this.api.i18n.t('Enter a caption');
-    caption.innerHTML = this.data.caption || '';
+    caption.innerHTML = this._data.caption || '';
     container.appendChild(caption);
     this.element = container;
     return container;
@@ -282,7 +252,7 @@ export default class Iframely {
       const data = await resp.json();
       if (data && data.html) {
         console.log('[Iframely] iframely: got html');
-        this.data = {
+        this._data = {
           caption: '',
           html: data.html,
           key: key || '',
