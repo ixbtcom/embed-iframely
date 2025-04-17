@@ -219,7 +219,7 @@ export default class Iframely {
             error.textContent = 'Не удалось получить embed-код для этой ссылки.';
           }
         } catch (e) {
-          error.textContent = 'Ошибка: ' + (e.message || e);
+          error.textContent = 'Ошибка: ' + (typeof e === 'object' && e && 'message' in e ? (e as any).message : String(e));
         } finally {
           button.disabled = false;
           button.textContent = 'Вставить';
