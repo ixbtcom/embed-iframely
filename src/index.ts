@@ -80,19 +80,20 @@ export default class Iframely {
   /** Static property with available services */
   static services = {
     youtube: {
-      regex: /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/,
+      // key = match[1] = id видео
+      regex: /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([\w-]{11})/,
     },
     instagram: {
-      regex: /^https?:\/\/(www\.)?instagram\.com\/p\/([a-zA-Z0-9_-]+)\/?$/,
+      regex: /^https?:\/\/(?:www\.)?instagram\.com\/p\/([a-zA-Z0-9_-]+)\/?/,
     },
     twitter: {
-      regex: /^https?:\/\/twitter\.com\/[a-zA-Z0-9_]+\/status\/([0-9]+)$/,
+      regex: /^https?:\/\/twitter\.com\/[a-zA-Z0-9_]+\/status\/([0-9]+)/,
     },
     facebook: {
-      regex: /^https?:\/\/(www\.)?facebook\.com\/([a-zA-Z0-9_]+)\/posts\/([0-9]+)$/,
+      regex: /^https?:\/\/(?:www\.)?facebook\.com\/([a-zA-Z0-9_]+)\/posts\/([0-9]+)/,
     },
     tiktok: {
-      regex: /^https?:\/\/(www\.)?tiktok\.com\/@[a-zA-Z0-9_]+\/video\/([0-9]+)$/,
+      regex: /^https?:\/\/(?:www\.)?tiktok\.com\/@[a-zA-Z0-9_]+\/video\/([0-9]+)/,
     },
   };
   /** Static property with patterns for paste handling configuration */
@@ -174,9 +175,11 @@ export default class Iframely {
           for (const [service, config] of Object.entries(Iframely.services)) {
             if (typeof config !== 'object' || !config.regex) continue;
             const match = config.regex.exec(url);
+            console.log('[Iframely] regex check:', service, match);
             if (match) {
               provider = service;
               key = match[1] || null;
+              console.log('[Iframely] matched:', { provider, key, url });
               break;
             }
           }
@@ -234,9 +237,11 @@ export default class Iframely {
     for (const [service, config] of Object.entries(Iframely.services)) {
       if (typeof config !== 'object' || !config.regex) continue;
       const match = config.regex.exec(url);
+      console.log('[Iframely] regex check:', service, match);
       if (match) {
         provider = service;
         key = match[1] || null;
+        console.log('[Iframely] matched:', { provider, key, url });
         break;
       }
     }
@@ -246,10 +251,11 @@ export default class Iframely {
   async handleIframelyFetch(url: string, provider: string|null, key: string|null) {
     const iframelyApiKey = '2142942481b218a645897e';
     const apiUrl = `https://iframe.ly/api/iframely?url=${encodeURIComponent(url)}&api_key=${iframelyApiKey}&iframe=0`;
-    console.log('[Iframely] iframely: fetch', apiUrl);
+    console.log('[Iframely] iframely: fetch', apiUrl, { provider, key, url });
     try {
       const resp = await fetch(apiUrl);
       const data = await resp.json();
+      console.log('[Iframely] iframely: api response', data);
       if (data && data.html) {
         console.log('[Iframely] iframely: got html');
         this._data = {
@@ -259,6 +265,7 @@ export default class Iframely {
           provider: provider || '',
           url,
         };
+        console.log('[Iframely] this._data after fetch', this._data);
       } else {
         console.warn('[Iframely] iframely: no html in response', data);
       }
@@ -277,6 +284,7 @@ export default class Iframely {
     if (captionElement) {
       this._data.caption = captionElement.innerHTML;
     }
+    console.log('[Iframely] save called', this._data);
     return {
       caption: this._data.caption,
       html: this._data.html,
@@ -293,7 +301,13 @@ export default class Iframely {
    */
   static get pasteConfig() {
     return {
-      patterns: Iframely.patterns,
+      patterns: [
+        /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([\w-]{11})/,
+        /^https?:\/\/(?:www\.)?instagram\.com\/p\/([a-zA-Z0-9_-]+)\/?/,
+        /^https?:\/\/twitter\.com\/[a-zA-Z0-9_]+\/status\/([0-9]+)/,
+        /^https?:\/\/(?:www\.)?facebook\.com\/([a-zA-Z0-9_]+)\/posts\/([0-9]+)/,
+        /^https?:\/\/(?:www\.)?tiktok\.com\/@[a-zA-Z0-9_]+\/video\/([0-9]+)/
+      ]
     };
   }
 
