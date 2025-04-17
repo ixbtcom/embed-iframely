@@ -335,4 +335,14 @@ export default class Iframely {
   static get isReadOnlySupported() {
     return true;
   }
+
+  /**
+   * Toolbox settings for Editor.js (+ menu)
+   */
+  static get toolbox() {
+    return {
+      title: 'Iframely',
+      icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="14" height="10" rx="2" stroke="#4C8BF5" stroke-width="2"/><rect x="7" y="9" width="6" height="2" rx="1" fill="#4C8BF5"/></svg>`
+    };
+  }
 }
